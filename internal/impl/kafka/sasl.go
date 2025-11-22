@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/IBM/sarama"
 
 	"github.com/warpstreamlabs/bento/internal/impl/aws/config"
@@ -53,7 +55,39 @@ func saslField() *service.ConfigField {
 		service.NewStringMapField("extensions").
 			Description("Key/value pairs to add to OAUTHBEARER authentication requests.").
 			Optional(),
-		service.NewObjectField("aws", config.SessionFields()...).
+		service.NewObjectField("azure",
+			service.NewBoolField("entra_enabled").
+				Description("Enable Azure Workload Identity using DefaultAzureCredential to request OAuth tokens.\n\nWhen enabled, the token and extensions fields are ignored.").
+				Optional().
+				Default(false).
+				Advanced(),
+			service.NewObjectField("token_request_options",
+				service.NewStringField("claims").
+					Description("Set additional claims for the token.").
+					Optional().
+					Default("").
+					Advanced(),
+				service.NewBoolField("enable_cae").
+					Description("Indicates whether to enable Continuous Access Evaluation (CAE) for the requested token.").
+					Optional().
+					Default(false).
+					Advanced(),
+				service.NewStringListField("scopes").
+					Description("Scopes contains the list of permission scopes required for the token, for Azure Event Hubs Kafka this should be set to `https://<namespace>.servicebus.windows.net/.default`.").
+					Optional().
+					Default([]string{}).
+					Advanced(),
+				service.NewStringField("tenant_id").
+					Description("tenant_id identifies the tenant from which to request the token. Azure credentials authenticate in their configured default tenants when this field isn't set.").
+					Optional().
+					Default("").
+					Advanced(),
+			).
+				Description("Optional Fields that can be set to use Azure Workload Identity authentication for Azure Event Hubs Kafka endpoints when using the OAUTHBEARER mechanism.").
+				Optional().
+				Advanced(),
+		).
+			service.NewObjectField("aws", config.SessionFields()...).
 			Description("Contains AWS specific fields for when the `mechanism` is set to `AWS_MSK_IAM`.").
 			Optional(),
 	).
@@ -146,12 +180,82 @@ func oauthSaslFromConfig(c *service.ParsedConfig) (sasl.Mechanism, error) {
 			return nil, err
 		}
 	}
+
+	azureConf := c.Namespace("azure")
+	azureEntraEnabled := false
+	if c.Contains("azure") {
+		if azureEntraEnabled, err = azureConf.FieldBool("entra_enabled"); err != nil {
+			return nil, err
+		}
+	}
+
+	if azureEntraEnabled {
+		if token != "" {
+			return nil, errors.New("token cannot be provided when azure entra_enabled is true")
+		}
+
+		tro, troErr := azureTokenRequestOptions(azureConf)
+		if troErr != nil {
+			return nil, troErr
+		}
+
+		cred, credErr := azidentity.NewDefaultAzureCredential(nil)
+		if credErr != nil {
+			return nil, fmt.Errorf("error getting default Azure credentials: %v", credErr)
+		}
+
+		return oauth.Oauth(func(c context.Context) (oauth.Auth, error) {
+			tok, err := cred.GetToken(c, tro)
+			if err != nil {
+				return oauth.Auth{}, fmt.Errorf("getting AAD token: %w", err)
+			}
+
+			return oauth.Auth{
+				Token: tok.Token,
+			}, nil
+		}), nil
+	}
+
 	return oauth.Oauth(func(c context.Context) (oauth.Auth, error) {
 		return oauth.Auth{
 			Token:      token,
 			Extensions: extensions,
 		}, nil
 	}), nil
+}
+
+func azureTokenRequestOptions(c *service.ParsedConfig) (policy.TokenRequestOptions, error) {
+	nsConf := c.Namespace("token_request_options")
+
+	claims, err := nsConf.FieldString("claims")
+	if err != nil {
+		return policy.TokenRequestOptions{}, err
+	}
+
+	enableCAE, err := nsConf.FieldBool("enable_cae")
+	if err != nil {
+		return policy.TokenRequestOptions{}, err
+	}
+
+	scopes, err := nsConf.FieldStringList("scopes")
+	if err != nil {
+		return policy.TokenRequestOptions{}, err
+	}
+	if len(scopes) == 0 {
+		return policy.TokenRequestOptions{}, errors.New("token_request_options.scopes must be set when azure entra_enabled is true")
+	}
+
+	tenantID, err := nsConf.FieldString("tenant_id")
+	if err != nil {
+		return policy.TokenRequestOptions{}, err
+	}
+
+	return policy.TokenRequestOptions{
+		Claims:    claims,
+		EnableCAE: enableCAE,
+		Scopes:    scopes,
+		TenantID:  tenantID,
+	}, nil
 }
 
 func scram256SaslFromConfig(c *service.ParsedConfig) (sasl.Mechanism, error) {
