@@ -86,8 +86,8 @@ func saslField() *service.ConfigField {
 				Description("Optional Fields that can be set to use Azure Workload Identity authentication for Azure Event Hubs Kafka endpoints when using the OAUTHBEARER mechanism.").
 				Optional().
 				Advanced(),
-		).
-			service.NewObjectField("aws", config.SessionFields()...).
+		),
+		service.NewObjectField("aws", config.SessionFields()...).
 			Description("Contains AWS specific fields for when the `mechanism` is set to `AWS_MSK_IAM`.").
 			Optional(),
 	).
