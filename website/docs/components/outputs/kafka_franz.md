@@ -653,14 +653,14 @@ Default: `""`
 Key/value pairs to add to OAUTHBEARER authentication requests.
 
 
-Type: `object`
+Type: `object`  
 
 ### `sasl[].azure`
 
 Optional Fields that can be set to use Azure Workload Identity authentication for Azure Event Hubs Kafka endpoints when using the OAUTHBEARER mechanism.
 
 
-Type: `object`
+Type: `object`  
 
 ### `sasl[].azure.entra_enabled`
 
@@ -669,47 +669,47 @@ Enable Azure Workload Identity using DefaultAzureCredential to request OAuth tok
 When enabled, the token and extensions fields are ignored.
 
 
-Type: `bool`
-Default: `false`
+Type: `bool`  
+Default: `false`  
 
 ### `sasl[].azure.token_request_options`
 
 Additional options to configure the requested Azure token.
 
 
-Type: `object`
+Type: `object`  
 
 ### `sasl[].azure.token_request_options.claims`
 
 Set additional claims for the token.
 
 
-Type: `string`
-Default: `""`
+Type: `string`  
+Default: `""`  
 
 ### `sasl[].azure.token_request_options.enable_cae`
 
 Indicates whether to enable Continuous Access Evaluation (CAE) for the requested token.
 
 
-Type: `bool`
-Default: `false`
+Type: `bool`  
+Default: `false`  
 
 ### `sasl[].azure.token_request_options.scopes`
 
 Scopes contains the list of permission scopes required for the token, for Azure Event Hubs Kafka this should be set to `https://<namespace>.servicebus.windows.net/.default`.
 
 
-Type: `array`
-Default: `[]`
+Type: `array`  
+Default: `[]`  
 
 ### `sasl[].azure.token_request_options.tenant_id`
 
 tenant_id identifies the tenant from which to request the token. Azure credentials authenticate in their configured default tenants when this field isn't set.
 
 
-Type: `string`
-Default: `""`
+Type: `string`  
+Default: `""`  
 
 ### `sasl[].aws`
 

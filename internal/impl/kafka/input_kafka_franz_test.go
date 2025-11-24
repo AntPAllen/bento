@@ -67,6 +67,49 @@ topic: foo
 `,
 			errContains: "seed broker address cannot be empty",
 		},
+		{
+			name: "azure entra enabled with token",
+			conf: `
+seed_brokers: [ broker_1 ]
+topics: [ test ]
+consumer_group: test
+sasl:
+  - mechanism: OAUTHBEARER
+    token: foo
+    azure:
+      entra_enabled: true
+      token_request_options:
+        scopes: [ foo ]
+`,
+			errContains: "token cannot be provided when azure entra_enabled is true",
+		},
+		{
+			name: "azure entra enabled without scopes",
+			conf: `
+seed_brokers: [ broker_1 ]
+topics: [ test ]
+consumer_group: test
+sasl:
+  - mechanism: OAUTHBEARER
+    azure:
+      entra_enabled: true
+`,
+			errContains: "token_request_options.scopes must be set when azure entra_enabled is true",
+		},
+		{
+			name: "azure entra enabled valid",
+			conf: `
+seed_brokers: [ broker_1 ]
+topics: [ test ]
+consumer_group: test
+sasl:
+  - mechanism: OAUTHBEARER
+    azure:
+      entra_enabled: true
+      token_request_options:
+        scopes: [ foo ]
+`,
+		},
 	}
 
 	for _, test := range testCases {
